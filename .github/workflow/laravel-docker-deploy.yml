@@ -1,0 +1,109 @@
+name: Laravel Docker Deploy with Vault
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-and-deploy:
+    name: Test and Deploy
+    runs-on: ubuntu-latest
+
+    env:
+      APP_ENV: testing
+      VAULT_ADDR: https://your-vault-server:8200
+
+    steps:
+    # Step 1: Check out code
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Step 2: Set up PHP environment
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v3
+      with:
+        php-version: '8.2'
+        extensions: mbstring, pdo_mysql, bcmath, intl
+        ini-values: post_max_size=256M, upload_max_filesize=256M, memory_limit=1G
+        tools: composer
+
+    # Step 3: Install Vault CLI
+    - name: Install Vault
+      run: |
+        curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+        sudo apt-get update && sudo apt-get install vault
+
+    # Step 4: Authenticate with Vault
+    - name: Authenticate with Vault
+      id: vault-login
+      env:
+        VAULT_ROLE: github-actions-role
+        VAULT_JWT: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        vault write auth/jwt/login \
+          role="$VAULT_ROLE" \
+          jwt="$VAULT_JWT" > login-output.json
+        export VAULT_TOKEN=$(jq -r ".auth.client_token" login-output.json)
+        echo "VAULT_TOKEN=$VAULT_TOKEN" >> $GITHUB_ENV
+
+    # Step 5: Fetch secrets from Vault
+    - name: Fetch secrets from Vault
+      id: fetch-secrets
+      env:
+        VAULT_TOKEN: ${{ env.VAULT_TOKEN }}
+      run: |
+        vault kv get -field=DOCKER_USERNAME github/my-repo-secrets > docker_username
+        vault kv get -field=DOCKER_PASSWORD github/my-repo-secrets > docker_password
+        vault kv get -field=DOCKER_IMAGE_NAME github/my-repo-secrets > docker_image_name
+        vault kv get -field=HOME_SERVER_HOST github/my-repo-secrets > home_server_host
+        vault kv get -field=HOME_SERVER_USER github/my-repo-secrets > home_server_user
+        vault kv get -field=HOME_SERVER_SSH_KEY github/my-repo-secrets > home_server_ssh_key
+        vault kv get -field=HOME_SERVER_SSH_PORT github/my-repo-secrets > home_server_ssh_port
+        echo "DOCKER_USERNAME=$(cat docker_username)" >> $GITHUB_ENV
+        echo "DOCKER_PASSWORD=$(cat docker_password)" >> $GITHUB_ENV
+        echo "DOCKER_IMAGE_NAME=$(cat docker_image_name)" >> $GITHUB_ENV
+        echo "HOME_SERVER_HOST=$(cat home_server_host)" >> $GITHUB_ENV
+        echo "HOME_SERVER_USER=$(cat home_server_user)" >> $GITHUB_ENV
+        echo "HOME_SERVER_SSH_KEY=$(cat home_server_ssh_key)" >> $GITHUB_ENV
+        echo "HOME_SERVER_SSH_PORT=$(cat home_server_ssh_port)" >> $GITHUB_ENV
+
+    # Step 6: Install Composer dependencies
+    - name: Install Composer dependencies
+      run: composer install --no-progress --no-suggest --prefer-dist --optimize-autoloader
+
+    # Step 7: Run Laravel tests
+    - name: Run tests
+      run: php artisan test --env=testing
+
+    # Step 8: Log in to DockerHub
+    - name: Log in to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ env.DOCKER_USERNAME }}
+        password: ${{ env.DOCKER_PASSWORD }}
+
+    # Step 9: Build Docker image
+    - name: Build Docker image
+      run: |
+        docker build -t ${{ env.DOCKER_IMAGE_NAME }}:latest .
+        docker tag ${{ env.DOCKER_IMAGE_NAME }}:latest ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+
+    # Step 10: Push Docker image to DockerHub
+    - name: Push Docker image
+      run: docker push ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+
+    # Step 11: Deploy to Home Server via SSH
+    - name: Deploy to Home Server
+      uses: appleboy/ssh-action@v0.1.8
+      with:
+        host: ${{ env.HOME_SERVER_HOST }}
+        username: ${{ env.HOME_SERVER_USER }}
+        key: ${{ env.HOME_SERVER_SSH_KEY }}
+        port: ${{ env.HOME_SERVER_SSH_PORT }}
+        script: |
+          docker pull ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+          docker stop laravel-container || true
+          docker rm laravel-container || true
+          docker run -d --name laravel-container -p 8080:80 ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest

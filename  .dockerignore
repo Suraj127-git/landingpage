@@ -1,0 +1,124 @@
+# Version Control
+.git
+.gitignore
+.gitattributes
+
+# Environment Files
+.env
+.env.backup
+.env.production
+.env.staging
+
+# Dependency Directories
+/vendor
+/node_modules
+/bootstrap/cache/*.php
+
+# Composer Files
+composer.phar
+composer.lock
+
+# Laravel Specific
+/storage/*.key
+/storage/logs/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/framework/cache/*
+
+# NPM & Frontend Build
+npm-debug.log
+yarn-error.log
+.npm
+.pnpm-store
+/public/hot
+/public/storage
+/public/build
+/public/mix-manifest.json
+
+# IDE & Editor Files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+.phpunit.result.cache
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary Files
+*.tmp
+*.bak
+*.swp
+*~
+.*.kate-swp
+.swp.*
+
+# Security & Sensitive Data
+*.pem
+*.key
+*.cert
+id_rsa
+id_ed25519
+
+# Docker & CI/CD
+Dockerfile
+docker-compose*
+.dockerignore
+.github
+.gitlab-ci.yml
+.circleci
+
+# Logs
+*.log
+error_log
+access_log
+
+# Testing
+/tests
+.phpunit.xml
+phpunit.xml
+.phpunit.result.cache
+
+# Unnecessary Development Files
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+UPGRADE.md
+LICENSE
+docs/
+examples/
+
+# Caching
+/bootstrap/cache/*.php
+/storage/framework/cache/data/*
+
+# Specific Laravel Directories
+/storage/app/public/*
+!/storage/app/public/.gitignore
+
+# Compiled Assets (rebuild in Docker)
+/public/css
+/public/js
+
+# Specific Framework Caches
+/storage/framework/views/*
+/storage/framework/sessions/*
+/storage/framework/cache/*
+
+# Development Tools
+.php-cs-fixer.php
+.php-cs-fixer.cache
+.phpcs.xml
+.php_cs
+.php_cs.dist
+.phpmd.xml
+infection.json
+psalm.xml
